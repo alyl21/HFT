@@ -1,0 +1,83 @@
+import random
+from queue import Queue
+import threading
+import time
+
+# Define a class HFT
+class HFT:
+    # Constructor
+    def __init__(self, symbol, price):
+        self.symbol = symbol
+        self.price = price
+        self.buy_queue = Queue()
+        self.sell_queue = Queue()
+
+    # Buy function
+    def buy(self, quantity, order_type):
+        # If order type is market
+        if order_type == "market":
+            # If there are no sellers available
+            if self.sell_queue.empty():
+                print(f"No sellers available for {self.symbol}. Placing limit order instead.")
+                self.buy_queue.put((quantity, "limit"))
+            # If there are sellers available
+            else:
+                start_time = time.time()
+                # While there are sellers available
+                while not self.sell_queue.empty():
+                    sell_quantity = self.sell_queue.get()
+                    # If the sell quantity is greater than or equal to the quantity
+                    if sell_quantity >= quantity:
+                        print(f"Matched {quantity} shares of {self.symbol} at {self.price}")
+                        # If the sell quantity is greater than the quantity
+                        if sell_quantity > quantity:
+                            self.sell_queue.put(sell_quantity - quantity)
+                        break
+                    # If the sell quantity is less than the quantity
+                    else:
+                        quantity -= sell_quantity
+                # If there is still quantity left to buy
+                if quantity > 0:
+                    print(f"No sellers available for {self.symbol}. Placing limit order instead.")
+                    self.buy_queue.put((quantity, "limit"))
+                # If the market order could not be executed within 1 second
+                elif time.time() - start_time > 1:
+                    print(f"Market order for {quantity} shares of {self.symbol} could not be executed within 1 second. Placing limit order instead.")
+                    self.buy_queue.put((quantity, "limit"))
+        # If order type is limit
+        elif order_type == "limit":
+            self.buy_queue.put((quantity, "limit"))
+
+    # Sell function
+    def sell(self, quantity, order_type):
+        # If order type is market
+        if order_type == "market":
+            # If there are no buyers available
+            if self.buy_queue.empty():
+                print(f"No buyers available for {self.symbol}. Placing limit order instead.")
+                self.sell_queue.put((quantity, "limit"))
+            # Ifthere are buyers available
+            else:
+                start_time = time.time()
+                # Loop through the buy queue until a match is found or the queue is empty
+                while not self.buy_queue.empty():
+                    buy_quantity = self.buy_queue.get()
+                    if buy_quantity >= quantity:
+                        print(f"Matched {quantity} shares of {self.symbol} at {self.price}")
+                        # If the buy quantity is greater than the sell quantity, put the remaining buy quantity back in the queue
+                        if buy_quantity > quantity:
+                            self.buy_queue.put(buy_quantity - quantity)
+                        break
+                    else:
+                        quantity -= buy_quantity
+                # If there is still quantity left to sell, place a limit order
+                if quantity > 0:
+                    print(f"No buyers available for {self.symbol}. Placing limit order instead.")
+                    self.sell_queue.put((quantity, "limit"))
+                # If the market order could not be executed within 1 second
+                elif time.time() - start_time > 1:
+                    print(f"Market order for {quantity} shares of {self.symbol} cannot be executed within 1 second. Placing limit order instead.")
+                    self.sell_queue.put((quantity, "limit"))
+        # If order type is limit
+        elif order_type == "limit":
+            self.sell_queue.put((quantity, "limit"))
